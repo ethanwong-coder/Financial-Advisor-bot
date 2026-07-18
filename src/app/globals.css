@@ -153,13 +153,15 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-fade-up,
-  .animate-floaty {
-    animation: none;
-  }
-  .card,
-  .btn-primary,
-  .btn-secondary {
-    transition: none;
+  /* Neutralize CSS + utility animations (animate-pulse, animate-spin, etc.).
+     Framer Motion is disabled separately via useReducedMotion(), and the 3D
+     scene renders nothing under reduced motion (see Scene3D). */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

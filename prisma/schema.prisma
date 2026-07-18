@@ -32,6 +32,7 @@ model User {
   accounts      Account[]
   flags         Flag[]
   chatMessages  ChatMessage[]
+  qcdEntries    QcdEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,6 +109,7 @@ model Account {
 
   inheritedIraDetail InheritedIraDetail?
   flags              Flag[]
+  qcdEntries         QcdEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,6 +178,26 @@ model ChatMessage {
   role    ChatRole
   content String
   createdAt DateTime @default(now())
+}
+
+// Qualified Charitable Distribution logged by an account owner (age 70½+) from
+// an IRA during a tax year. Additive to the model; used by the planning-tools
+// QCD tracker only — the compliance rules engine does not read or write it.
+model QcdEntry {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId        String
+  account          Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  amount           Decimal  @db.Decimal(18, 2)
+  distributionDate DateTime
+  charityName      String?
+  taxYear          Int
+  notes            String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, taxYear])
 }
 
 enum MaritalStatus {

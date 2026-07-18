@@ -8,6 +8,7 @@ import {
   RELATIONSHIP_LABELS,
 } from "@/lib/labels";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { Spinner } from "@/components/Spinner";
 
 const ACCOUNT_TYPES = Object.keys(ACCOUNT_TYPE_LABELS);
 const BENEFICIARY_RELATIONSHIPS = Object.keys(RELATIONSHIP_LABELS);
@@ -295,7 +296,13 @@ export default function NewAccountPage() {
         {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="flex gap-3">
           <button className="btn-primary" disabled={saving}>
-            {saving ? "Saving…" : "Save account"}
+            {saving ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" /> Saving…
+              </>
+            ) : (
+              "Save account"
+            )}
           </button>
           <button
             type="button"

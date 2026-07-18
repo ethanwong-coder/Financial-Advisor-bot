@@ -183,6 +183,48 @@ npm run test:rules  # just the rules engine
 
 ---
 
+## Market snapshot (informational — kept separate from compliance)
+
+The dashboard shows a small **Market Snapshot** card (S&P 500, Dow, Nasdaq via
+the SPY/DIA/QQQ ETF proxies, with daily % change color-coded green/red). It is
+deliberately isolated:
+
+- Lives in its own module ([src/lib/market/quotes.ts](src/lib/market/quotes.ts))
+  and route ([src/app/api/market/route.ts](src/app/api/market/route.ts)) — it
+  does **not** touch `src/lib/rules` or `src/lib/flags`.
+- Shows **general index levels only** — it never references your accounts,
+  balances, or holdings, and never influences a flag.
+- Rendered at the **bottom** of the dashboard, clearly labeled as general market
+  information and *not* investment advice, well away from the flags and the
+  assistant.
+- Provider: **Finnhub** free tier. Set `MARKET_DATA_API_KEY` in `.env`. Responses
+  are cached **60s server-side** so the free-tier rate limit isn't a concern. If
+  the key is missing or a request fails, the card shows “Market data
+  unavailable” and the rest of the dashboard is unaffected.
+
+## Planning tools (Phase 1 — informational calculators)
+
+Five deterministic, unit-tested calculators live under
+[src/lib/planning/](src/lib/planning/) — **fully separate from the rules engine
+and flags** (`src/lib/rules` / `src/lib/flags` are untouched). No LLM is ever
+involved in the math; each is pure code with tests, and every result screen
+carries: *“Informational estimate only — not financial or tax advice. Consult a
+CPA or financial advisor before making decisions.”* Reached from the **Planning
+tools** section of the dashboard; each has a page under `src/app/planning/*`.
+
+| Tool | What it does | Key assumptions / limits |
+|---|---|---|
+| **Retirement projection** | Projects balance at retirement (monthly compounding) and a simple year-by-year depletion estimate. | Default return **6% nominal** (user-adjustable); inflation optional (default 0 = nominal). Simple depletion, **not Monte Carlo**. An illustration, not a guarantee. |
+| **Social Security illustrator** | Estimated monthly benefit at 62 / FRA / 70 with breakeven ages + chart. | Public SSA formulas (5/9%/mo early, 8%/yr delayed; FRA from birth year). Ignores COLA and the Jan-1 birthday edge. |
+| **Quarterly tax estimate** | Safe-harbor estimated payments + the four due dates. | 90% of current year vs 100%/110% of prior year ($150k AGI split; $75k MFS). Due dates shift for weekends/holidays. |
+| **NIIT / AMT screener** | Exact 3.8% NIIT; a rough AMT **exposure flag**. | NIIT thresholds are statutory/fixed. AMT is a **screening flag only** (uses MAGI as a crude AMTI proxy; tax-year-2025 exemption figures) — a real AMT calc needs Form 6251. |
+| **QCD tracker** | Logs Qualified Charitable Distributions and shows how much of an IRA's RMD they satisfy. | RMD is **read** from the existing engine's inherited-IRA estimate where available, else entered from your custodian. Requires age 70½+. Annual QCD exclusion limit checked (2025 figure). |
+
+**Data model:** QCD tracking adds one **additive** `QcdEntry` model (migration
+`prisma/migrations/20260718010000_add_qcd_entry`) with relations to `User` and
+`Account`; no existing model columns were changed. **Tax constants** (AMT
+exemptions, QCD limit, tax year) are documented and must be updated annually.
+
 ## Security
 
 - **Encryption at rest:** account numbers and Plaid access tokens are encrypted

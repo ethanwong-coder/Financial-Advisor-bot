@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { RELATIONSHIP_LABELS } from "@/lib/labels";
+import { Spinner } from "@/components/Spinner";
 
 interface Profile {
   fullName: string | null;
@@ -47,6 +48,7 @@ export default function ProfilePage() {
   });
   const [family, setFamily] = useState<FamilyMember[]>([]);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     const [pRes, fRes] = await Promise.all([
@@ -75,6 +77,7 @@ export default function ProfilePage() {
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setSaved(false);
+    setSaving(true);
     const res = await fetch("/api/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -87,6 +90,7 @@ export default function ProfilePage() {
         dependentsCount: Number(profile.dependentsCount) || 0,
       }),
     });
+    setSaving(false);
     if (res.ok) setSaved(true);
   }
 
@@ -162,8 +166,18 @@ export default function ProfilePage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-primary">Save profile</button>
-          {saved && <span className="text-sm text-emerald-700">Saved.</span>}
+          <button className="btn-primary" disabled={saving}>
+            {saving ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" /> Saving…
+              </>
+            ) : (
+              "Save profile"
+            )}
+          </button>
+          {saved && !saving && (
+            <span className="text-sm text-emerald-700">Saved.</span>
+          )}
         </div>
       </form>
 
