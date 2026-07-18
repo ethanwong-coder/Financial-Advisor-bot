@@ -1,0 +1,274 @@
+// Financial "case file" data model.
+//
+// Design notes:
+//  - Sensitive values (account numbers, SSNs if ever collected) are stored
+//    ENCRYPTED at rest in `*Enc` string columns via src/lib/crypto. The raw
+//    values are never persisted in plaintext and never logged.
+//  - Auth uses Auth.js with the Credentials provider + JWT sessions, so we do
+//    NOT use Auth.js's own Account/Session tables (which would also collide by
+//    name with our financial `Account` model). The `User.passwordHash` column
+//    backs credential login.
+//  - Enum string values intentionally match the rules-engine string unions in
+//    src/lib/rules/types.ts so snapshots map cleanly.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String?
+
+  profile       Profile?
+  familyMembers FamilyMember[]
+  lifeEvents    LifeEvent[]
+  accounts      Account[]
+  flags         Flag[]
+  chatMessages  ChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id               String        @id @default(cuid())
+  userId           String        @unique
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName         String?
+  stateOfResidence String?
+  dateOfBirth      DateTime?
+  maritalStatus    MaritalStatus @default(SINGLE)
+  currentSpouseName String?
+  dependentsCount  Int           @default(0)
+  // The next scheduled quarterly review/check-in date.
+  nextReviewDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model FamilyMember {
+  id           String             @id @default(cuid())
+  userId       String
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relationship FamilyRelationship
+  fullName     String
+  dateOfBirth  DateTime?
+  // For SPOUSE / FORMER_SPOUSE rows: relevant key dates.
+  marriageDate DateTime?
+  divorceDate  DateTime?
+  notes        String?
+
+  createdAt DateTime @default(now())
+}
+
+model LifeEvent {
+  id                String        @id @default(cuid())
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              LifeEventType
+  eventDate         DateTime
+  description       String?
+  relatedPersonName String?
+
+  createdAt DateTime @default(now())
+}
+
+model Account {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source          AccountSource @default(MANUAL)
+  // Plaid linkage (sandbox). Access tokens are stored encrypted on PlaidItem.
+  plaidItemId     String?
+  plaidAccountId  String?
+  institutionName String?
+  accountType     AccountType   @default(OTHER)
+  nickname        String
+  balance         Decimal?      @db.Decimal(18, 2)
+  currency        String        @default("USD")
+  balanceAsOf     DateTime?
+
+  // Encrypted at rest. Plaid & most custodians do NOT expose account numbers or
+  // beneficiaries; these are typically manual entry.
+  accountNumberEnc String?
+
+  // Beneficiary metadata (usually manual — custodians rarely expose it).
+  beneficiaryPrimaryName         String?
+  beneficiaryPrimaryRelationship BeneficiaryRelationship?
+  beneficiaryContingentName      String?
+  beneficiaryLastConfirmed       DateTime?
+
+  inheritedIraDetail InheritedIraDetail?
+  flags              Flag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InheritedIraDetail {
+  id                     String                       @id @default(cuid())
+  accountId              String                       @unique
+  account                Account                      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  originalOwnerName      String?
+  originalOwnerDateOfBirth DateTime?
+  originalOwnerDateOfDeath DateTime
+  beneficiaryClass       InheritedIraBeneficiaryClass
+  beneficiaryDateOfBirth DateTime?
+  currentYearDistribution Decimal?                    @db.Decimal(18, 2)
+  priorYearEndBalance    Decimal?                     @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A Plaid Item (one linked institution). Access token stored ENCRYPTED.
+model PlaidItem {
+  id             String   @id @default(cuid())
+  userId         String
+  itemId         String   @unique
+  accessTokenEnc String
+  institutionName String?
+  createdAt      DateTime @default(now())
+}
+
+model Flag {
+  id             String     @id @default(cuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId      String?
+  account        Account?   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  ruleId         RuleId
+  code           String
+  severity       Severity
+  title          String
+  detail         String
+  dataJson       Json?
+  status         FlagStatus @default(OPEN)
+  dismissedReason String?
+
+  // Stable per-user key ("<accountId|profile>:<code>") so re-evaluation updates
+  // the same flag and preserves resolved/dismissed status.
+  dedupeKey String
+
+  firstDetectedAt DateTime  @default(now())
+  lastSeenAt      DateTime  @default(now())
+  resolvedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, status])
+}
+
+model ChatMessage {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    ChatRole
+  content String
+  createdAt DateTime @default(now())
+}
+
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  SEPARATED
+}
+
+enum FamilyRelationship {
+  SPOUSE
+  FORMER_SPOUSE
+  CHILD
+  DEPENDENT
+  PARENT
+  SIBLING
+  OTHER
+}
+
+enum LifeEventType {
+  MARRIAGE
+  DIVORCE
+  DEATH_OF_RELATIVE
+  INHERITANCE
+  BIRTH
+  OTHER
+}
+
+enum AccountSource {
+  PLAID
+  MANUAL
+}
+
+enum AccountType {
+  TRADITIONAL_IRA
+  ROTH_IRA
+  INHERITED_IRA
+  PLAN_401K
+  PLAN_403B
+  HSA
+  LIFE_INSURANCE
+  ANNUITY
+  BROKERAGE
+  BANK_CHECKING
+  BANK_SAVINGS
+  OTHER
+}
+
+enum BeneficiaryRelationship {
+  SPOUSE
+  FORMER_SPOUSE
+  CHILD
+  GRANDCHILD
+  PARENT
+  SIBLING
+  TRUST
+  ESTATE
+  CHARITY
+  OTHER
+  NONE
+}
+
+enum InheritedIraBeneficiaryClass {
+  SPOUSE
+  MINOR_CHILD_OF_OWNER
+  DISABLED
+  CHRONICALLY_ILL
+  NOT_MORE_THAN_10_YEARS_YOUNGER
+  NON_ELIGIBLE
+  NON_PERSON
+}
+
+enum RuleId {
+  INHERITED_IRA_10YR
+  BENEFICIARY_MISMATCH
+}
+
+enum Severity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FlagStatus {
+  OPEN
+  DISMISSED
+  RESOLVED
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
