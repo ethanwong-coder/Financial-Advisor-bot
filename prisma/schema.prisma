@@ -33,6 +33,10 @@ model User {
   flags         Flag[]
   chatMessages  ChatMessage[]
   qcdEntries    QcdEntry[]
+  estateDocuments   EstateDocument[]
+  goals             Goal[]
+  checklistItems    ChecklistItemState[]
+  educationAccounts EducationAccount[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -198,6 +202,81 @@ model QcdEntry {
   createdAt DateTime @default(now())
 
   @@index([userId, taxYear])
+}
+
+// --- Phase 2–4 planning trackers (additive; used only by planning tools) ---
+
+model EstateDocument {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docType         EstateDocType
+  exists          Boolean       @default(false)
+  lastReviewed    DateTime?
+  attorneyName    String?
+  attorneyContact String?
+  storageLocation String?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, docType])
+}
+
+model Goal {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  targetAmount Decimal   @db.Decimal(18, 2)
+  targetDate   DateTime?
+  currentSaved Decimal   @default(0) @db.Decimal(18, 2)
+  startDate    DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChecklistItemState {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistKey String
+  itemKey      String
+  checked      Boolean  @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, checklistKey, itemKey])
+}
+
+model EducationAccount {
+  id                 String               @id @default(cuid())
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType        EducationAccountType @default(PLAN_529)
+  institutionName    String?
+  beneficiaryName    String?
+  balance            Decimal?             @db.Decimal(18, 2)
+  annualContribution Decimal?             @db.Decimal(18, 2)
+  stateOfPlan        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum EstateDocType {
+  WILL
+  REVOCABLE_TRUST
+  IRREVOCABLE_TRUST
+  FINANCIAL_POA
+  HEALTHCARE_POA
+}
+
+enum EducationAccountType {
+  PLAN_529
+  COVERDELL
 }
 
 enum MaritalStatus {

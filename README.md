@@ -225,6 +225,51 @@ tools** section of the dashboard; each has a page under `src/app/planning/*`.
 `Account`; no existing model columns were changed. **Tax constants** (AMT
 exemptions, QCD limit, tax year) are documented and must be updated annually.
 
+## Planning tools (Phases 2–4)
+
+The dashboard's **Planning tools** section is organized into five sub-categories
+(Retirement & tax · Estate & insurance · Cash flow · Education & business · Life
+transitions & goals). Everything remains additive, deterministic (pure code +
+Vitest, no LLM math), auth-guarded, and disclaimer-wrapped.
+
+- **Estate document tracker** — logs will / trust / financial POA / healthcare
+  directive with an existence + last-reviewed status (flags 3+ years or a review
+  predating a logged life event). Tracking only; no document interpretation.
+- **Insurance needs** — life (needs-based), disability (income replacement), and
+  LTC (national-average cost-of-care gap; figures adjustable). Every result ends
+  with the "licensed agent required; no product recommended" note.
+- **Cash flow** — budget summary, avalanche-vs-snowball debt payoff, emergency
+  fund gap, and mortgage/refi with a closing-cost breakeven.
+- **Education** — 529/Coverdell tracking (with a generic state-deduction note),
+  a **simplified, clearly-labeled** SAI-style aid estimate, and a standard-vs-IDR
+  student-loan comparison.
+- **Business retirement** — SEP vs SIMPLE vs Solo 401(k) contribution room using
+  documented **2026** IRS limits (flagged for annual verification).
+- **Equity comp** — ISO / NSO / RSU / ESPP tax illustrations; the ISO path reuses
+  the Phase 1 AMT screener for exposure.
+- **Life-transition checklists** — standard task lists (marriage, divorce, job
+  change, inheritance, relocation) with plain-English "why"s; beneficiary items
+  point back to the existing flag system for awareness.
+- **Goal tracking** — named goals with progress bars and on-pace flags.
+- **Learn** — a static, plain-language glossary of the concepts these tools use.
+
+Quarterly check-ins ([scripts/send-reminders.ts](scripts/send-reminders.ts)) now
+also surface incomplete checklist items, goals behind pace, and estate documents
+overdue for review, alongside the flag re-evaluation.
+
+**Data model:** four additive models — `EstateDocument`, `Goal`,
+`ChecklistItemState`, `EducationAccount` (migration
+`prisma/migrations/20260718020000_add_planning_models`) — each related to `User`
+only; no existing model columns changed. **Assumptions to verify/update yearly**
+are centralized in [src/lib/planning/limits.ts](src/lib/planning/limits.ts)
+(IRS 2026 limits) and [src/lib/planning/ltc-costs.ts](src/lib/planning/ltc-costs.ts)
+(LTC averages); the aid/IDR estimates are deliberately simplified and labeled as
+rough, not official.
+
+> The rules engine (`src/lib/rules`) and flag logic (`src/lib/flags`) are
+> unchanged across all planning phases — the planning tools only *read* from the
+> engine (e.g. the QCD tracker reads the inherited-IRA RMD estimate).
+
 ## Security
 
 - **Encryption at rest:** account numbers and Plaid access tokens are encrypted

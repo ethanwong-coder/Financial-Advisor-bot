@@ -38,31 +38,45 @@ interface Account {
   accountNumberMasked: string | null;
 }
 
-const PLANNING_TOOLS = [
+const PLANNING_CATEGORIES = [
   {
-    href: "/planning/retirement",
-    title: "Retirement projection",
-    blurb: "Illustrate your projected balance and how long it may last.",
+    title: "Retirement & tax",
+    tools: [
+      { href: "/planning/retirement", title: "Retirement projection", blurb: "Projected balance and how long it may last." },
+      { href: "/planning/social-security", title: "Social Security", blurb: "Benefit at 62, FRA, and 70, with breakeven ages." },
+      { href: "/planning/quarterly-tax", title: "Quarterly tax", blurb: "Safe-harbor estimated payments and due dates." },
+      { href: "/planning/niit-amt", title: "NIIT / AMT screener", blurb: "3.8% investment tax and rough AMT exposure." },
+      { href: "/planning/qcd", title: "QCD tracker", blurb: "Charitable IRA distributions against your RMD." },
+    ],
   },
   {
-    href: "/planning/social-security",
-    title: "Social Security illustrator",
-    blurb: "Estimated benefit at 62, FRA, and 70, with breakeven ages.",
+    title: "Estate & insurance",
+    tools: [
+      { href: "/planning/estate-documents", title: "Estate documents", blurb: "Track will, trust, POAs, and directives." },
+      { href: "/planning/insurance", title: "Insurance needs", blurb: "Life, disability, and LTC coverage gaps." },
+    ],
   },
   {
-    href: "/planning/quarterly-tax",
-    title: "Quarterly tax estimate",
-    blurb: "Safe-harbor estimated payments and due dates.",
+    title: "Cash flow",
+    tools: [
+      { href: "/planning/cash-flow", title: "Cash-flow tools", blurb: "Budget, debt payoff, emergency fund, mortgage/refi." },
+    ],
   },
   {
-    href: "/planning/niit-amt",
-    title: "NIIT / AMT screener",
-    blurb: "Screen the 3.8% investment tax and rough AMT exposure.",
+    title: "Education & business",
+    tools: [
+      { href: "/planning/education", title: "Education planning", blurb: "529 tracking, aid estimate, student loans." },
+      { href: "/planning/business-retirement", title: "Business retirement", blurb: "SEP vs SIMPLE vs Solo 401(k) comparison." },
+      { href: "/planning/equity-comp", title: "Equity comp", blurb: "ISO, NSO, RSU, and ESPP tax illustrations." },
+    ],
   },
   {
-    href: "/planning/qcd",
-    title: "QCD tracker",
-    blurb: "Log charitable IRA distributions against your RMD.",
+    title: "Life transitions & goals",
+    tools: [
+      { href: "/planning/checklists", title: "Life-transition checklists", blurb: "Marriage, divorce, job change, inheritance, moving." },
+      { href: "/planning/goals", title: "Goal tracking", blurb: "Named goals with progress toward a target." },
+      { href: "/planning/learn", title: "Learn the basics", blurb: "Plain-language explainers for these concepts." },
+    ],
   },
 ];
 
@@ -366,13 +380,22 @@ export default function DashboardPage() {
           Informational, educational calculators. Each computes with deterministic
           code and is not a recommendation — always confirm with a CPA or advisor.
         </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {PLANNING_TOOLS.map((t) => (
-            <Link key={t.href} href={t.href} className="card card-hover block">
-              <div className="mb-2 h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow" />
-              <h3 className="font-medium text-slate-900">{t.title}</h3>
-              <p className="mt-1 text-sm text-slate-600">{t.blurb}</p>
-            </Link>
+        <div className="space-y-6">
+          {PLANNING_CATEGORIES.map((cat) => (
+            <div key={cat.title}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand">
+                {cat.title}
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {cat.tools.map((t) => (
+                  <Link key={t.href} href={t.href} className="card card-hover block">
+                    <div className="mb-2 h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow" />
+                    <h4 className="font-medium text-slate-900">{t.title}</h4>
+                    <p className="mt-1 text-sm text-slate-600">{t.blurb}</p>
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </section>
