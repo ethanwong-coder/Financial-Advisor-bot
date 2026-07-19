@@ -1,13 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Spinner } from "@/components/Spinner";
+import { Gate } from "@/components/billing/Gate";
 
 interface Msg {
   role: "USER" | "ASSISTANT";
   content: string;
 }
 
+function TypingDots() {
+  return (
+    <div className="inline-flex items-center gap-1 rounded-2xl bg-slate-100 px-4 py-3">
+      {[0, 150, 300].map((d) => (
+        <span
+          key={d}
+          className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400"
+          style={{ animationDelay: `${d}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function ChatPage() {
+  const reduce = useReducedMotion();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,8 +39,8 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, loading]);
+    endRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+  }, [messages, loading, reduce]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -55,31 +73,41 @@ export default function ChatPage() {
         itself and never gives investment or legal advice.
       </p>
 
+      <Gate requiredTier="PLUS" label="the chat assistant">
       <div className="card min-h-[50vh] space-y-4">
-        {messages.length === 0 && (
+        {messages.length === 0 && !loading && (
           <p className="text-sm text-slate-400">
             Try: “What does my inherited-IRA flag mean?” or “Which beneficiary
             issues should I look at first?”
           </p>
         )}
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={m.role === "USER" ? "text-right" : "text-left"}
-          >
-            <div
-              className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-                m.role === "USER"
-                  ? "bg-brand text-white"
-                  : "bg-slate-100 text-slate-800"
-              }`}
+        <AnimatePresence initial={false}>
+          {messages.map((m, i) => (
+            <motion.div
+              key={i}
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className={m.role === "USER" ? "text-right" : "text-left"}
             >
-              {m.content}
-            </div>
+              <div
+                className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
+                  m.role === "USER"
+                    ? "bg-brand text-white shadow-sm"
+                    : "bg-slate-100 text-slate-800"
+                }`}
+              >
+                {m.content}
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {loading && (
+          <div className="text-left">
+            <TypingDots />
           </div>
-        ))}
-        {loading && <p className="text-sm text-slate-400">Thinking…</p>}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        )}
+        {error && <p className="text-sm text-rose-600">{error}</p>}
         <div ref={endRef} />
       </div>
 
@@ -89,11 +117,13 @@ export default function ChatPage() {
           placeholder="Ask about a flag…"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          disabled={loading}
         />
-        <button className="btn-primary" disabled={loading}>
-          Send
+        <button className="btn-primary" disabled={loading || !input.trim()}>
+          {loading ? <Spinner className="h-4 w-4" /> : "Send"}
         </button>
       </form>
+      </Gate>
     </div>
   );
 }

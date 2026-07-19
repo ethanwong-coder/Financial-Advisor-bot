@@ -2,6 +2,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { badRequest, json, requireUser, serverError } from "@/lib/http";
 import { encryptField } from "@/lib/crypto/field-encryption";
+import { getUserTier } from "@/lib/billing/entitlements";
+import { accountLimit } from "@/lib/billing/tiers";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -107,6 +109,22 @@ export async function GET() {
 export async function POST(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+
+  // Free tier is limited to a single connected account.
+  const tier = await getUserTier(userId);
+  const existingCount = await prisma.account.count({ where: { userId } });
+  if (existingCount >= accountLimit(tier)) {
+    return json(
+      {
+        error: "upgrade_required",
+        feature: "unlimited_accounts",
+        currentTier: tier,
+        requiredTier: "PLUS",
+        message: "The Free plan is limited to 1 connected account. Upgrade to Plus for unlimited accounts.",
+      },
+      403,
+    );
+  }
 
   let body: unknown;
   try {

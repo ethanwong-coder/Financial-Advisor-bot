@@ -5,7 +5,14 @@ import type { NextAuthConfig } from "next-auth";
  * It must NOT import Prisma or any Node-only module — the middleware runs on the
  * Edge runtime. The database-backed Credentials provider is added in auth.ts.
  */
-const PROTECTED_PREFIXES = ["/dashboard", "/profile", "/accounts", "/chat"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/profile",
+  "/accounts",
+  "/chat",
+  "/planning",
+  "/settings",
+];
 
 export const authConfig = {
   // Trust the deployment host (needed when running behind Docker/a reverse

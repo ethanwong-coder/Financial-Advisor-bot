@@ -32,6 +32,12 @@ model User {
   accounts      Account[]
   flags         Flag[]
   chatMessages  ChatMessage[]
+  qcdEntries    QcdEntry[]
+  estateDocuments   EstateDocument[]
+  goals             Goal[]
+  checklistItems    ChecklistItemState[]
+  educationAccounts EducationAccount[]
+  subscription      Subscription?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,6 +114,7 @@ model Account {
 
   inheritedIraDetail InheritedIraDetail?
   flags              Flag[]
+  qcdEntries         QcdEntry[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -176,6 +183,147 @@ model ChatMessage {
   role    ChatRole
   content String
   createdAt DateTime @default(now())
+}
+
+// Qualified Charitable Distribution logged by an account owner (age 70½+) from
+// an IRA during a tax year. Additive to the model; used by the planning-tools
+// QCD tracker only — the compliance rules engine does not read or write it.
+model QcdEntry {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId        String
+  account          Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  amount           Decimal  @db.Decimal(18, 2)
+  distributionDate DateTime
+  charityName      String?
+  taxYear          Int
+  notes            String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, taxYear])
+}
+
+// --- Phase 2–4 planning trackers (additive; used only by planning tools) ---
+
+model EstateDocument {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docType         EstateDocType
+  exists          Boolean       @default(false)
+  lastReviewed    DateTime?
+  attorneyName    String?
+  attorneyContact String?
+  storageLocation String?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, docType])
+}
+
+model Goal {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  targetAmount Decimal   @db.Decimal(18, 2)
+  targetDate   DateTime?
+  currentSaved Decimal   @default(0) @db.Decimal(18, 2)
+  startDate    DateTime  @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ChecklistItemState {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistKey String
+  itemKey      String
+  checked      Boolean  @default(false)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, checklistKey, itemKey])
+}
+
+model EducationAccount {
+  id                 String               @id @default(cuid())
+  userId             String
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType        EducationAccountType @default(PLAN_529)
+  institutionName    String?
+  beneficiaryName    String?
+  balance            Decimal?             @db.Decimal(18, 2)
+  annualContribution Decimal?             @db.Decimal(18, 2)
+  stateOfPlan        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum EstateDocType {
+  WILL
+  REVOCABLE_TRUST
+  IRREVOCABLE_TRUST
+  FINANCIAL_POA
+  HEALTHCARE_POA
+}
+
+enum EducationAccountType {
+  PLAN_529
+  COVERDELL
+}
+
+// --- Billing / subscription (additive) ---
+// A user's tier is derived by src/lib/billing/entitlements.ts. No row = FREE.
+// The Stripe webhook is the single source of truth that writes this row.
+model Subscription {
+  id                   String              @id @default(cuid())
+  userId               String              @unique
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?             @unique
+  tier                 SubscriptionTier    @default(FREE)
+  billingInterval      BillingInterval?
+  status               SubscriptionStatus  @default(ACTIVE)
+  currentPeriodEnd     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SubscriptionTier {
+  FREE
+  PLUS
+  PRO
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+// --- Waitlist (additive; unrelated to auth/users) ---
+model WaitlistSignup {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  token          String    @unique
+  confirmedAt    DateTime?
+  tokenExpiresAt DateTime
+  createdAt      DateTime  @default(now())
 }
 
 enum MaritalStatus {

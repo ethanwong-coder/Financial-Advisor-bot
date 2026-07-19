@@ -2,13 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { Spinner } from "@/components/Spinner";
+import { Skeleton, SkeletonCard } from "@/components/Skeleton";
+import { MarketSnapshot } from "@/components/MarketSnapshot";
 import {
   ACCOUNT_TYPE_LABELS,
   RELATIONSHIP_LABELS,
   currency,
 } from "@/lib/labels";
+import { useTier } from "@/components/billing/useTier";
+import { meetsTier, Tier, TIER_LABELS } from "@/lib/billing/tiers";
 
 interface Flag {
   id: string;
@@ -34,10 +40,65 @@ interface Account {
   accountNumberMasked: string | null;
 }
 
+const PLANNING_CATEGORIES: {
+  title: string;
+  tools: { href: string; title: string; blurb: string; tier: Tier }[];
+}[] = [
+  {
+    title: "Retirement & tax",
+    tools: [
+      { href: "/planning/retirement", title: "Retirement projection", blurb: "Projected balance and how long it may last.", tier: "FREE" },
+      { href: "/planning/social-security", title: "Social Security", blurb: "Benefit at 62, FRA, and 70, with breakeven ages.", tier: "PLUS" },
+      { href: "/planning/quarterly-tax", title: "Quarterly tax", blurb: "Safe-harbor estimated payments and due dates.", tier: "PLUS" },
+      { href: "/planning/niit-amt", title: "NIIT / AMT screener", blurb: "3.8% investment tax and rough AMT exposure.", tier: "PLUS" },
+      { href: "/planning/qcd", title: "QCD tracker", blurb: "Charitable IRA distributions against your RMD.", tier: "PLUS" },
+    ],
+  },
+  {
+    title: "Estate & insurance",
+    tools: [
+      { href: "/planning/estate-documents", title: "Estate documents", blurb: "Track will, trust, POAs, and directives.", tier: "PLUS" },
+      { href: "/planning/insurance", title: "Insurance needs", blurb: "Life, disability, and LTC coverage gaps.", tier: "PLUS" },
+    ],
+  },
+  {
+    title: "Cash flow",
+    tools: [
+      { href: "/planning/cash-flow", title: "Cash-flow tools", blurb: "Budget & emergency fund (free); debt & mortgage (Plus).", tier: "FREE" },
+    ],
+  },
+  {
+    title: "Education & business",
+    tools: [
+      { href: "/planning/education", title: "Education planning", blurb: "529 tracking, aid estimate, student loans.", tier: "PRO" },
+      { href: "/planning/business-retirement", title: "Business retirement", blurb: "SEP vs SIMPLE vs Solo 401(k) comparison.", tier: "PRO" },
+      { href: "/planning/equity-comp", title: "Equity comp", blurb: "ISO, NSO, RSU, and ESPP tax illustrations.", tier: "PRO" },
+    ],
+  },
+  {
+    title: "Life transitions & goals",
+    tools: [
+      { href: "/planning/checklists", title: "Life-transition checklists", blurb: "Marriage, divorce, job change, inheritance, moving.", tier: "PRO" },
+      { href: "/planning/goals", title: "Goal tracking", blurb: "Named goals with progress toward a target.", tier: "PRO" },
+      { href: "/planning/learn", title: "Learn the basics", blurb: "Plain-language explainers for these concepts.", tier: "FREE" },
+    ],
+  },
+  {
+    title: "Family & reports (Pro)",
+    tools: [
+      { href: "/planning/family", title: "Family accounts", blurb: "Link a second person's finances under your plan.", tier: "PRO" },
+      { href: "/planning/reports", title: "PDF reports", blurb: "Export flags + planning outputs for a professional.", tier: "PRO" },
+    ],
+  },
+];
+
 export default function DashboardPage() {
+  const reduce = useReducedMotion();
+  const userTier = useTier();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [flags, setFlags] = useState<Flag[]>([]);
   const [nextReviewDate, setNextReviewDate] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -50,6 +111,7 @@ export default function DashboardPage() {
     if (aRes.ok) setAccounts((await aRes.json()).accounts);
     if (fRes.ok) setFlags((await fRes.json()).flags);
     if (pRes.ok) setNextReviewDate((await pRes.json()).profile?.nextReviewDate ?? null);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -83,7 +145,6 @@ export default function DashboardPage() {
       return;
     }
     if (tokenData.mode === "mock") {
-      // Mock mode: exchange immediately, no Plaid Link UI required.
       const exRes = await fetch("/api/plaid/exchange", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -93,7 +154,7 @@ export default function DashboardPage() {
       setMessage(
         exRes.ok
           ? `Linked ${exData.linked} sandbox account(s). ${exData.note}`
-          : exData.error ?? "Could not link accounts.",
+          : exData.message ?? exData.error ?? "Could not link accounts.",
       );
       await load();
     } else {
@@ -121,26 +182,46 @@ export default function DashboardPage() {
   const closedFlags = flags.filter((f) => f.status !== "OPEN");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">
           Your <span className="text-gradient">case file</span>
         </h1>
         <div className="flex gap-2">
           <button className="btn-secondary" onClick={connectSandbox} disabled={busy !== null}>
-            {busy === "plaid" ? "Linking…" : "Connect accounts"}
+            {busy === "plaid" ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" /> Linking…
+              </>
+            ) : (
+              "Connect accounts"
+            )}
           </button>
           <button className="btn-primary" onClick={evaluate} disabled={busy !== null}>
-            {busy === "evaluate" ? "Checking…" : "Run checks"}
+            {busy === "evaluate" ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" /> Checking…
+              </>
+            ) : (
+              "Run checks"
+            )}
           </button>
         </div>
       </div>
 
-      {message && (
-        <div className="rounded-lg border border-brand/30 bg-teal-50 px-4 py-2 text-sm text-teal-900">
-          {message}
-        </div>
-      )}
+      <AnimatePresence>
+        {message && (
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="rounded-lg border border-brand/30 bg-teal-50 px-4 py-2 text-sm text-teal-900"
+          >
+            {message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ReviewBanner nextReviewDate={nextReviewDate} />
 
@@ -149,55 +230,73 @@ export default function DashboardPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-900">
           Flags &amp; warnings{" "}
           <span className="text-sm font-normal text-slate-500">
-            ({openFlags.length} open)
+            ({loading ? "…" : `${openFlags.length} open`})
           </span>
         </h2>
-        {openFlags.length === 0 ? (
+
+        {loading ? (
+          <div className="space-y-3">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : openFlags.length === 0 ? (
           <div className="card text-sm text-slate-600">
             No open flags. Add accounts and life-event details, then “Run checks”
             to scan for coordination gaps.
             <DisclaimerBanner inline />
           </div>
         ) : (
-          <div className="space-y-3">
-            {openFlags.map((f) => (
-              <div key={f.id} className="card">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <SeverityBadge severity={f.severity} />
-                      {f.accountNickname && (
-                        <span className="text-xs text-slate-500">
-                          {f.accountNickname}
-                        </span>
-                      )}
+          <div>
+            <AnimatePresence initial={false}>
+              {openFlags.map((f) => (
+                <motion.div
+                  key={f.id}
+                  layout={!reduce}
+                  initial={reduce ? false : { opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
+                  transition={{ duration: reduce ? 0 : 0.22, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div className="card mb-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <SeverityBadge severity={f.severity} />
+                          {f.accountNickname && (
+                            <span className="text-xs text-slate-500">
+                              {f.accountNickname}
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="mt-2 font-medium text-slate-900">{f.title}</h3>
+                        <p className="mt-1 text-sm text-slate-600">{f.detail}</p>
+                        <DisclaimerBanner inline />
+                      </div>
+                      <div className="flex shrink-0 flex-col gap-1">
+                        <button
+                          className="text-xs font-medium text-emerald-700 hover:underline"
+                          onClick={() => updateFlag(f.id, "RESOLVED")}
+                        >
+                          Mark resolved
+                        </button>
+                        <button
+                          className="text-xs text-slate-500 hover:underline"
+                          onClick={() => updateFlag(f.id, "DISMISSED")}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
                     </div>
-                    <h3 className="mt-2 font-medium text-slate-900">{f.title}</h3>
-                    <p className="mt-1 text-sm text-slate-600">{f.detail}</p>
-                    <DisclaimerBanner inline />
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1">
-                    <button
-                      className="text-xs text-emerald-700 hover:underline"
-                      onClick={() => updateFlag(f.id, "RESOLVED")}
-                    >
-                      Mark resolved
-                    </button>
-                    <button
-                      className="text-xs text-slate-500 hover:underline"
-                      onClick={() => updateFlag(f.id, "DISMISSED")}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </section>
 
-      {closedFlags.length > 0 && (
+      {!loading && closedFlags.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer text-slate-600">
             Resolved / dismissed ({closedFlags.length})
@@ -234,14 +333,19 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-slate-900">
             Accounts{" "}
             <span className="text-sm font-normal text-slate-500">
-              ({accounts.length})
+              ({loading ? "…" : accounts.length})
             </span>
           </h2>
           <Link href="/accounts/new" className="text-sm text-brand hover:underline">
             + Add account manually
           </Link>
         </div>
-        {accounts.length === 0 ? (
+        {loading ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+        ) : accounts.length === 0 ? (
           <div className="card text-sm text-slate-600">
             No accounts yet. “Connect accounts” pulls types and balances from
             Plaid (sandbox), or add one manually — manual entry is how you record
@@ -279,6 +383,61 @@ export default function DashboardPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* Planning Tools — informational calculators, separate from the Flags
+          compliance section. Each is deterministic and not a recommendation. */}
+      <section className="border-t border-slate-200/70 pt-8">
+        <h2 className="text-lg font-semibold text-slate-900">Planning tools</h2>
+        <p className="mb-3 mt-1 text-sm text-slate-500">
+          Informational, educational calculators. Each computes with deterministic
+          code and is not a recommendation — always confirm with a CPA or advisor.
+        </p>
+        <div className="space-y-6">
+          {PLANNING_CATEGORIES.map((cat) => (
+            <div key={cat.title}>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand">
+                {cat.title}
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {cat.tools.map((t) => {
+                  const locked =
+                    userTier != null && t.tier !== "FREE" && !meetsTier(userTier, t.tier);
+                  return (
+                    <Link key={t.href} href={t.href} className="card card-hover block">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow" />
+                        {t.tier !== "FREE" && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              locked ? "bg-slate-100 text-slate-500" : "bg-teal-100 text-teal-800"
+                            }`}
+                          >
+                            {locked ? `🔒 ${TIER_LABELS[t.tier]}` : TIER_LABELS[t.tier]}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-medium text-slate-900">{t.title}</h4>
+                      <p className="mt-1 text-sm text-slate-600">{t.blurb}</p>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Market snapshot — GENERAL market info, deliberately separated from the
+          flags/assistant and unrelated to the user's accounts or holdings. */}
+      <section className="border-t border-slate-200/70 pt-8">
+        <h2 className="text-lg font-semibold text-slate-900">Market snapshot</h2>
+        <p className="mb-3 mt-1 text-xs text-slate-500">
+          General market information — ETF proxies for major indices (SPY, DIA,
+          QQQ). Not related to your accounts, holdings, or the flags above, and
+          not investment advice.
+        </p>
+        <MarketSnapshot />
       </section>
     </div>
   );

@@ -183,6 +183,166 @@ npm run test:rules  # just the rules engine
 
 ---
 
+## Market snapshot (informational — kept separate from compliance)
+
+The dashboard shows a small **Market Snapshot** card (S&P 500, Dow, Nasdaq via
+the SPY/DIA/QQQ ETF proxies, with daily % change color-coded green/red). It is
+deliberately isolated:
+
+- Lives in its own module ([src/lib/market/quotes.ts](src/lib/market/quotes.ts))
+  and route ([src/app/api/market/route.ts](src/app/api/market/route.ts)) — it
+  does **not** touch `src/lib/rules` or `src/lib/flags`.
+- Shows **general index levels only** — it never references your accounts,
+  balances, or holdings, and never influences a flag.
+- Rendered at the **bottom** of the dashboard, clearly labeled as general market
+  information and *not* investment advice, well away from the flags and the
+  assistant.
+- Provider: **Finnhub** free tier. Set `MARKET_DATA_API_KEY` in `.env`. Responses
+  are cached **60s server-side** so the free-tier rate limit isn't a concern. If
+  the key is missing or a request fails, the card shows “Market data
+  unavailable” and the rest of the dashboard is unaffected.
+
+## Planning tools (Phase 1 — informational calculators)
+
+Five deterministic, unit-tested calculators live under
+[src/lib/planning/](src/lib/planning/) — **fully separate from the rules engine
+and flags** (`src/lib/rules` / `src/lib/flags` are untouched). No LLM is ever
+involved in the math; each is pure code with tests, and every result screen
+carries: *“Informational estimate only — not financial or tax advice. Consult a
+CPA or financial advisor before making decisions.”* Reached from the **Planning
+tools** section of the dashboard; each has a page under `src/app/planning/*`.
+
+| Tool | What it does | Key assumptions / limits |
+|---|---|---|
+| **Retirement projection** | Projects balance at retirement (monthly compounding) and a simple year-by-year depletion estimate. | Default return **6% nominal** (user-adjustable); inflation optional (default 0 = nominal). Simple depletion, **not Monte Carlo**. An illustration, not a guarantee. |
+| **Social Security illustrator** | Estimated monthly benefit at 62 / FRA / 70 with breakeven ages + chart. | Public SSA formulas (5/9%/mo early, 8%/yr delayed; FRA from birth year). Ignores COLA and the Jan-1 birthday edge. |
+| **Quarterly tax estimate** | Safe-harbor estimated payments + the four due dates. | 90% of current year vs 100%/110% of prior year ($150k AGI split; $75k MFS). Due dates shift for weekends/holidays. |
+| **NIIT / AMT screener** | Exact 3.8% NIIT; a rough AMT **exposure flag**. | NIIT thresholds are statutory/fixed. AMT is a **screening flag only** (uses MAGI as a crude AMTI proxy; tax-year-2025 exemption figures) — a real AMT calc needs Form 6251. |
+| **QCD tracker** | Logs Qualified Charitable Distributions and shows how much of an IRA's RMD they satisfy. | RMD is **read** from the existing engine's inherited-IRA estimate where available, else entered from your custodian. Requires age 70½+. Annual QCD exclusion limit checked (2025 figure). |
+
+**Data model:** QCD tracking adds one **additive** `QcdEntry` model (migration
+`prisma/migrations/20260718010000_add_qcd_entry`) with relations to `User` and
+`Account`; no existing model columns were changed. **Tax constants** (AMT
+exemptions, QCD limit, tax year) are documented and must be updated annually.
+
+## Planning tools (Phases 2–4)
+
+The dashboard's **Planning tools** section is organized into five sub-categories
+(Retirement & tax · Estate & insurance · Cash flow · Education & business · Life
+transitions & goals). Everything remains additive, deterministic (pure code +
+Vitest, no LLM math), auth-guarded, and disclaimer-wrapped.
+
+- **Estate document tracker** — logs will / trust / financial POA / healthcare
+  directive with an existence + last-reviewed status (flags 3+ years or a review
+  predating a logged life event). Tracking only; no document interpretation.
+- **Insurance needs** — life (needs-based), disability (income replacement), and
+  LTC (national-average cost-of-care gap; figures adjustable). Every result ends
+  with the "licensed agent required; no product recommended" note.
+- **Cash flow** — budget summary, avalanche-vs-snowball debt payoff, emergency
+  fund gap, and mortgage/refi with a closing-cost breakeven.
+- **Education** — 529/Coverdell tracking (with a generic state-deduction note),
+  a **simplified, clearly-labeled** SAI-style aid estimate, and a standard-vs-IDR
+  student-loan comparison.
+- **Business retirement** — SEP vs SIMPLE vs Solo 401(k) contribution room using
+  documented **2026** IRS limits (flagged for annual verification).
+- **Equity comp** — ISO / NSO / RSU / ESPP tax illustrations; the ISO path reuses
+  the Phase 1 AMT screener for exposure.
+- **Life-transition checklists** — standard task lists (marriage, divorce, job
+  change, inheritance, relocation) with plain-English "why"s; beneficiary items
+  point back to the existing flag system for awareness.
+- **Goal tracking** — named goals with progress bars and on-pace flags.
+- **Learn** — a static, plain-language glossary of the concepts these tools use.
+
+Quarterly check-ins ([scripts/send-reminders.ts](scripts/send-reminders.ts)) now
+also surface incomplete checklist items, goals behind pace, and estate documents
+overdue for review, alongside the flag re-evaluation.
+
+**Data model:** four additive models — `EstateDocument`, `Goal`,
+`ChecklistItemState`, `EducationAccount` (migration
+`prisma/migrations/20260718020000_add_planning_models`) — each related to `User`
+only; no existing model columns changed. **Assumptions to verify/update yearly**
+are centralized in [src/lib/planning/limits.ts](src/lib/planning/limits.ts)
+(IRS 2026 limits) and [src/lib/planning/ltc-costs.ts](src/lib/planning/ltc-costs.ts)
+(LTC averages); the aid/IDR estimates are deliberately simplified and labeled as
+rough, not official.
+
+> The rules engine (`src/lib/rules`) and flag logic (`src/lib/flags`) are
+> unchanged across all planning phases — the planning tools only *read* from the
+> engine (e.g. the QCD tracker reads the inherited-IRA RMD estimate).
+
+## Subscriptions & billing (freemium)
+
+Three tiers gate access to the feature set. The **tier is stored in the database**
+(`Subscription` row) and is the **single source of truth** — nothing reads
+entitlements from Stripe directly.
+
+| Tier | Price | Unlocks |
+| --- | --- | --- |
+| **Free** | $0 | 1 connected account · manual "run checks" only · basic calculators (retirement, budgeting, emergency fund) |
+| **Plus** | $9/mo · $89/yr | Unlimited accounts · automatic quarterly flag re-eval · full chat · full tax/SS/NIIT-AMT/QCD/insurance/debt/mortgage calculators · estate document tracker |
+| **Pro** | $24/mo · $199/yr | Everything in Plus · education / business-retirement / equity-comp tools · life-transition checklists & goals · expanded check-ins · family accounts · PDF reports |
+
+**How gating works**
+
+- [`src/lib/billing/tiers.ts`](src/lib/billing/tiers.ts) — pure, client-safe:
+  the `Feature → minimum tier` map, `hasFeature()`, `accountLimit()`, and pricing
+  math. Imported by both the server guard and the UI so they never drift.
+- [`src/lib/billing/entitlements.ts`](src/lib/billing/entitlements.ts) — server:
+  `getUserTier(userId)` (expired / canceled / past-due → `FREE`) and
+  `requireTierFeature(userId, feature)` which returns a `403 upgrade_required`
+  before any gated work runs. Unit-tested in `entitlements.test.ts`.
+- **Server-side on every gated route** — chat, the Plus/Pro planning APIs, the
+  account-creation limit, and the Plaid link loop all call the guard. Client-side
+  `useTier()` + `<Gate>` and the dashboard tier badges are *UX only*; the server
+  is authoritative. `src/lib/rules` and `src/lib/flags` are never modified — only
+  access to the routes that call them is gated.
+- **Pages:** `/pricing` (monthly/annual toggle) and `/settings/billing` (current
+  plan + Stripe Billing Portal link).
+
+**Turning on Stripe** (deferred — the app runs fully on the Free tier without it)
+
+1. In the Stripe Dashboard create **4 recurring Prices**: Plus monthly, Plus
+   annual, Pro monthly, Pro annual.
+2. Set the env vars in [`.env.example`](.env.example): `STRIPE_SECRET_KEY`,
+   `STRIPE_WEBHOOK_SECRET`, and the four `STRIPE_*_PRICE_ID`s.
+3. Finish the three route stubs in `src/app/api/billing/` (`checkout`, `portal`,
+   `webhook`) — each documents exactly what to implement. **Checkout** uses a
+   hosted Stripe Checkout session; **portal** uses the Billing Portal; **webhook**
+   must **verify the signature** and upsert the `Subscription` row on
+   `checkout.session.completed` / `customer.subscription.updated|deleted` /
+   `invoice.payment_failed`. Until configured, `/api/billing/*` returns
+   `503 billing_not_configured` and the pricing page shows a notice.
+
+> Card data is never stored or handled by this app — Stripe Checkout and the
+> Billing Portal own all of it. The webhook must reject unsigned/invalid requests.
+
+The seed ([scripts/seed.ts](scripts/seed.ts)) gives `demo@example.com` a **Pro**
+subscription so every gated feature is exercisable without Stripe.
+
+## Waitlist
+
+An embeddable email-capture flow with double opt-in confirmation.
+
+- **Form:** [`src/components/WaitlistForm.tsx`](src/components/WaitlistForm.tsx)
+  (single email input + honeypot), shown on the public `/waitlist` page and
+  linked from `/pricing`.
+- **Signup** (`POST /api/waitlist`): validates the email, applies a honeypot +
+  simple in-memory per-IP rate limit (no CAPTCHA), **dedupes** (an existing
+  confirmed email is treated as already-registered, not an error), issues a
+  single-use token, and sends the confirmation email.
+- **Confirm** (`GET /api/waitlist/confirm?token=…`): validates the token, handles
+  expired / invalid / already-confirmed gracefully, sets `confirmedAt`, and
+  redirects to `/waitlist/confirmed` with a status. No crashes on bad tokens.
+- **Email:** [`src/lib/email/send.ts`](src/lib/email/send.ts) is a **mock/log
+  adapter** — no provider is wired up, so the confirmation email (including the
+  link) is printed to the server console. Copy it from the log to confirm
+  locally. To send real email, implement a provider branch (e.g. Resend) as the
+  file header describes and keep the mock fallback.
+
+**Data model:** one additive `WaitlistSignup` model (migration
+`prisma/migrations/20260718030000_add_billing_waitlist`, alongside
+`Subscription` + its enums); no existing columns changed.
+
 ## Security
 
 - **Encryption at rest:** account numbers and Plaid access tokens are encrypted
