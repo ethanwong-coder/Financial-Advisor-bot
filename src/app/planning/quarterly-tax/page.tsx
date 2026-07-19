@@ -38,6 +38,7 @@ export default function QuarterlyTaxPage() {
 
   return (
     <PlanningShell
+      requiredTier="PLUS"
       title="Estimated quarterly tax calculator"
       subtitle="IRS safe-harbor estimate: the smaller of 90% of this year's tax or 100%/110% of last year's. Informational — confirm with your CPA."
     >

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Spinner } from "@/components/Spinner";
+import { Gate } from "@/components/billing/Gate";
 
 interface Msg {
   role: "USER" | "ASSISTANT";
@@ -72,6 +73,7 @@ export default function ChatPage() {
         itself and never gives investment or legal advice.
       </p>
 
+      <Gate requiredTier="PLUS" label="the chat assistant">
       <div className="card min-h-[50vh] space-y-4">
         {messages.length === 0 && !loading && (
           <p className="text-sm text-slate-400">
@@ -121,6 +123,7 @@ export default function ChatPage() {
           {loading ? <Spinner className="h-4 w-4" /> : "Send"}
         </button>
       </form>
+      </Gate>
     </div>
   );
 }

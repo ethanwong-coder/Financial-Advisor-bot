@@ -17,6 +17,7 @@ import { evaluateAndReconcile } from "../src/lib/flags/reconcile";
 import { computeDocumentStatus } from "../src/lib/planning/estate-documents";
 import { goalProgress } from "../src/lib/planning/goals";
 import { CHECKLISTS } from "../src/lib/planning/checklists";
+import { getUserTier } from "../src/lib/billing/entitlements";
 
 const QUARTER_DAYS = 91;
 
@@ -79,19 +80,36 @@ async function main() {
   // eslint-disable-next-line no-console
   console.log(`[reminders] ${due.length} user(s) due for a quarterly review.`);
 
+  let processed = 0;
+  let skippedFree = 0;
+
   for (const profile of due) {
+    // FREE tier gets NO automatic re-evaluation — they run checks manually on
+    // the dashboard. Skip without rescheduling so an upgrade takes effect next run.
+    const tier = await getUserTier(profile.userId, now);
+    if (tier === "FREE") {
+      skippedFree += 1;
+      continue;
+    }
+
     const flagResult = await evaluateAndReconcile(profile.userId, now);
-    const summary = await buildCheckInSummary(profile.userId, now);
+
+    // PRO gets the expanded check-in content; PLUS gets flag re-evaluation only.
+    let extra = "";
+    if (tier === "PRO") {
+      const summary = await buildCheckInSummary(profile.userId, now);
+      extra =
+        `; ${summary.estateNeedsReview} estate document(s) needing review; ` +
+        `${summary.goalsBehind} goal(s) behind pace; ` +
+        `${summary.checklistItemsOutstanding} checklist item(s) outstanding`;
+    }
 
     // TODO: send a real notification here (email/SMS). Link back into the app;
     // do NOT include sensitive details in the message body.
     // eslint-disable-next-line no-console
     console.log(
-      `[reminders] notified ${profile.user.email}: ` +
-        `${flagResult.totalFindings} flag(s) checked (${flagResult.created} new); ` +
-        `${summary.estateNeedsReview} estate document(s) needing review; ` +
-        `${summary.goalsBehind} goal(s) behind pace; ` +
-        `${summary.checklistItemsOutstanding} checklist item(s) outstanding.`,
+      `[reminders] notified ${profile.user.email} (${tier}): ` +
+        `${flagResult.totalFindings} flag(s) checked (${flagResult.created} new)${extra}.`,
     );
 
     const next = new Date(now);
@@ -100,7 +118,11 @@ async function main() {
       where: { userId: profile.userId },
       data: { nextReviewDate: next },
     });
+    processed += 1;
   }
+
+  // eslint-disable-next-line no-console
+  console.log(`[reminders] processed ${processed}, skipped ${skippedFree} free-tier user(s).`);
 }
 
 main()

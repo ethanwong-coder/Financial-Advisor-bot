@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { badRequest, json, requireUser, serverError } from "@/lib/http";
+import { requireTierFeature } from "@/lib/billing/entitlements";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 export async function GET() {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "checklists");
+  if (gate) return gate;
   const rows = await prisma.checklistItemState.findMany({
     where: { userId, checked: true },
     select: { checklistKey: true, itemKey: true },
@@ -26,6 +29,8 @@ const putSchema = z.object({
 export async function PUT(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "checklists");
+  if (gate) return gate;
   let body: unknown;
   try {
     body = await req.json();

@@ -152,6 +152,7 @@ function EsppTab() {
 export default function EquityCompPage() {
   return (
     <PlanningShell
+      requiredTier="PRO"
       title="Equity compensation modeling"
       subtitle="Simplified tax illustrations for ISOs, NSOs, RSUs, and ESPP. Not tax advice."
     >

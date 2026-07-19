@@ -270,6 +270,79 @@ rough, not official.
 > unchanged across all planning phases — the planning tools only *read* from the
 > engine (e.g. the QCD tracker reads the inherited-IRA RMD estimate).
 
+## Subscriptions & billing (freemium)
+
+Three tiers gate access to the feature set. The **tier is stored in the database**
+(`Subscription` row) and is the **single source of truth** — nothing reads
+entitlements from Stripe directly.
+
+| Tier | Price | Unlocks |
+| --- | --- | --- |
+| **Free** | $0 | 1 connected account · manual "run checks" only · basic calculators (retirement, budgeting, emergency fund) |
+| **Plus** | $9/mo · $89/yr | Unlimited accounts · automatic quarterly flag re-eval · full chat · full tax/SS/NIIT-AMT/QCD/insurance/debt/mortgage calculators · estate document tracker |
+| **Pro** | $24/mo · $199/yr | Everything in Plus · education / business-retirement / equity-comp tools · life-transition checklists & goals · expanded check-ins · family accounts · PDF reports |
+
+**How gating works**
+
+- [`src/lib/billing/tiers.ts`](src/lib/billing/tiers.ts) — pure, client-safe:
+  the `Feature → minimum tier` map, `hasFeature()`, `accountLimit()`, and pricing
+  math. Imported by both the server guard and the UI so they never drift.
+- [`src/lib/billing/entitlements.ts`](src/lib/billing/entitlements.ts) — server:
+  `getUserTier(userId)` (expired / canceled / past-due → `FREE`) and
+  `requireTierFeature(userId, feature)` which returns a `403 upgrade_required`
+  before any gated work runs. Unit-tested in `entitlements.test.ts`.
+- **Server-side on every gated route** — chat, the Plus/Pro planning APIs, the
+  account-creation limit, and the Plaid link loop all call the guard. Client-side
+  `useTier()` + `<Gate>` and the dashboard tier badges are *UX only*; the server
+  is authoritative. `src/lib/rules` and `src/lib/flags` are never modified — only
+  access to the routes that call them is gated.
+- **Pages:** `/pricing` (monthly/annual toggle) and `/settings/billing` (current
+  plan + Stripe Billing Portal link).
+
+**Turning on Stripe** (deferred — the app runs fully on the Free tier without it)
+
+1. In the Stripe Dashboard create **4 recurring Prices**: Plus monthly, Plus
+   annual, Pro monthly, Pro annual.
+2. Set the env vars in [`.env.example`](.env.example): `STRIPE_SECRET_KEY`,
+   `STRIPE_WEBHOOK_SECRET`, and the four `STRIPE_*_PRICE_ID`s.
+3. Finish the three route stubs in `src/app/api/billing/` (`checkout`, `portal`,
+   `webhook`) — each documents exactly what to implement. **Checkout** uses a
+   hosted Stripe Checkout session; **portal** uses the Billing Portal; **webhook**
+   must **verify the signature** and upsert the `Subscription` row on
+   `checkout.session.completed` / `customer.subscription.updated|deleted` /
+   `invoice.payment_failed`. Until configured, `/api/billing/*` returns
+   `503 billing_not_configured` and the pricing page shows a notice.
+
+> Card data is never stored or handled by this app — Stripe Checkout and the
+> Billing Portal own all of it. The webhook must reject unsigned/invalid requests.
+
+The seed ([scripts/seed.ts](scripts/seed.ts)) gives `demo@example.com` a **Pro**
+subscription so every gated feature is exercisable without Stripe.
+
+## Waitlist
+
+An embeddable email-capture flow with double opt-in confirmation.
+
+- **Form:** [`src/components/WaitlistForm.tsx`](src/components/WaitlistForm.tsx)
+  (single email input + honeypot), shown on the public `/waitlist` page and
+  linked from `/pricing`.
+- **Signup** (`POST /api/waitlist`): validates the email, applies a honeypot +
+  simple in-memory per-IP rate limit (no CAPTCHA), **dedupes** (an existing
+  confirmed email is treated as already-registered, not an error), issues a
+  single-use token, and sends the confirmation email.
+- **Confirm** (`GET /api/waitlist/confirm?token=…`): validates the token, handles
+  expired / invalid / already-confirmed gracefully, sets `confirmedAt`, and
+  redirects to `/waitlist/confirmed` with a status. No crashes on bad tokens.
+- **Email:** [`src/lib/email/send.ts`](src/lib/email/send.ts) is a **mock/log
+  adapter** — no provider is wired up, so the confirmation email (including the
+  link) is printed to the server console. Copy it from the log to confirm
+  locally. To send real email, implement a provider branch (e.g. Resend) as the
+  file header describes and keep the mock fallback.
+
+**Data model:** one additive `WaitlistSignup` model (migration
+`prisma/migrations/20260718030000_add_billing_waitlist`, alongside
+`Subscription` + its enums); no existing columns changed.
+
 ## Security
 
 - **Encryption at rest:** account numbers and Plaid access tokens are encrypted

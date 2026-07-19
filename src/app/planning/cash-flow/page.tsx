@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PlanningShell } from "@/components/planning/PlanningShell";
 import { Tabs } from "@/components/planning/Tabs";
 import { NumberField, ResultCard, Stat } from "@/components/planning/ui";
+import { Gate } from "@/components/billing/Gate";
 import { emergencyFund, summarizeBudget, BudgetResult, EmergencyFundResult } from "@/lib/planning/cashflow";
 import { compareRefinance, RefiResult } from "@/lib/planning/mortgage";
 import { comparePayoff, Debt, PayoffComparison } from "@/lib/planning/debt-payoff";
@@ -209,9 +210,25 @@ export default function CashFlowPage() {
       <Tabs
         tabs={[
           { key: "budget", label: "Budget", content: <BudgetTab /> },
-          { key: "debt", label: "Debt payoff", content: <DebtTab /> },
+          {
+            key: "debt",
+            label: "Debt payoff",
+            content: (
+              <Gate requiredTier="PLUS" label="the debt payoff calculator">
+                <DebtTab />
+              </Gate>
+            ),
+          },
           { key: "emergency", label: "Emergency fund", content: <EmergencyTab /> },
-          { key: "mortgage", label: "Mortgage / refi", content: <MortgageTab /> },
+          {
+            key: "mortgage",
+            label: "Mortgage / refi",
+            content: (
+              <Gate requiredTier="PLUS" label="the mortgage / refi calculator">
+                <MortgageTab />
+              </Gate>
+            ),
+          },
         ]}
       />
     </PlanningShell>

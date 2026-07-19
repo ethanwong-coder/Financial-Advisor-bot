@@ -76,7 +76,7 @@ export default function QcdPage() {
     "Log Qualified Charitable Distributions from an IRA and see how much of the account's RMD they satisfy. RMD figures are read from your existing inherited-IRA checks; for other IRAs, enter the RMD from your custodian.";
 
   return (
-    <PlanningShell title="QCD tracker" subtitle={subtitle}>
+    <PlanningShell requiredTier="PLUS" title="QCD tracker" subtitle={subtitle}>
       {!data ? (
         <div className="space-y-3">
           <Skeleton className="h-24" />

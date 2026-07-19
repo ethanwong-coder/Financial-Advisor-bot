@@ -69,6 +69,7 @@ export default function EstateDocumentsPage() {
 
   return (
     <PlanningShell
+      requiredTier="PLUS"
       title="Estate document tracker"
       subtitle="Track whether your key documents exist and when they were last reviewed. Tracking only — this never interprets a document or gives legal advice."
     >

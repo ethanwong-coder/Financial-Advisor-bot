@@ -4,6 +4,7 @@ import { badRequest, json, requireUser, serverError } from "@/lib/http";
 import { loadCaseFile } from "@/lib/case-file";
 import { runChat, type CaseContext, type ChatTurn } from "@/lib/llm/claude";
 import type { RuleFinding, RuleId, Severity } from "@/lib/rules/types";
+import { requireTierFeature } from "@/lib/billing/entitlements";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -13,6 +14,8 @@ const schema = z.object({ message: z.string().trim().min(1).max(4000) });
 export async function POST(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "chat");
+  if (gate) return gate;
 
   let body: unknown;
   try {
@@ -79,6 +82,8 @@ export async function POST(req: Request) {
 export async function GET() {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "chat");
+  if (gate) return gate;
   const messages = await prisma.chatMessage.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },

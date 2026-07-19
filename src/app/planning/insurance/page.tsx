@@ -169,6 +169,7 @@ function LtcTab() {
 export default function InsurancePage() {
   return (
     <PlanningShell
+      requiredTier="PLUS"
       title="Insurance needs analysis"
       subtitle="Estimate coverage gaps for life, disability, and long-term-care insurance. Gaps only — no products recommended."
     >

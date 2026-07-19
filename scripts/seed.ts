@@ -93,11 +93,33 @@ async function main() {
     },
   });
 
+  // Give the demo user a PRO subscription so every gated feature (chat, the
+  // full calculator suite, checklists, goals, family, reports) is exercisable
+  // without Stripe. Tier is read from this row — the single source of truth.
+  const farFuture = new Date();
+  farFuture.setFullYear(farFuture.getFullYear() + 10);
+  await prisma.subscription.upsert({
+    where: { userId: user.id },
+    update: {
+      tier: "PRO",
+      status: "ACTIVE",
+      billingInterval: "ANNUAL",
+      currentPeriodEnd: farFuture,
+    },
+    create: {
+      userId: user.id,
+      tier: "PRO",
+      status: "ACTIVE",
+      billingInterval: "ANNUAL",
+      currentPeriodEnd: farFuture,
+    },
+  });
+
   const result = await evaluateAndReconcile(user.id, new Date());
   // eslint-disable-next-line no-console
   console.log("Seed complete. Flags reconciled:", result);
   // eslint-disable-next-line no-console
-  console.log("Login: demo@example.com / password123");
+  console.log("Login: demo@example.com / password123  (tier: PRO)");
 }
 
 main()

@@ -47,6 +47,9 @@ export default async function RootLayout({
                   <Link href="/chat" className="text-slate-600 hover:text-slate-900">
                     Assistant
                   </Link>
+                  <Link href="/settings/billing" className="text-slate-600 hover:text-slate-900">
+                    Billing
+                  </Link>
                   <SignOutButton />
                 </>
               ) : (

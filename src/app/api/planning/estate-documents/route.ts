@@ -2,6 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { badRequest, json, requireUser, serverError } from "@/lib/http";
 import { computeDocumentStatus, EstateDocType } from "@/lib/planning/estate-documents";
+import { requireTierFeature } from "@/lib/billing/entitlements";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -17,6 +18,8 @@ const DOC_TYPES = [
 export async function GET() {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "estate_documents");
+  if (gate) return gate;
 
   const [docs, lastEvent] = await Promise.all([
     prisma.estateDocument.findMany({ where: { userId } }),
@@ -64,6 +67,8 @@ const putSchema = z.object({
 export async function PUT(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "estate_documents");
+  if (gate) return gate;
 
   let body: unknown;
   try {

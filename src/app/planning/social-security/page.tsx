@@ -28,6 +28,7 @@ export default function SocialSecurityPage() {
 
   return (
     <PlanningShell
+      requiredTier="PLUS"
       title="Social Security claiming illustrator"
       subtitle="Public SSA reduction/credit formulas show your estimated monthly benefit at 62, Full Retirement Age, and 70. This is an illustration, not a claim-age recommendation."
     >

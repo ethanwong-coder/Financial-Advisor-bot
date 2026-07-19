@@ -37,6 +37,7 @@ model User {
   goals             Goal[]
   checklistItems    ChecklistItemState[]
   educationAccounts EducationAccount[]
+  subscription      Subscription?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -277,6 +278,52 @@ enum EstateDocType {
 enum EducationAccountType {
   PLAN_529
   COVERDELL
+}
+
+// --- Billing / subscription (additive) ---
+// A user's tier is derived by src/lib/billing/entitlements.ts. No row = FREE.
+// The Stripe webhook is the single source of truth that writes this row.
+model Subscription {
+  id                   String              @id @default(cuid())
+  userId               String              @unique
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?             @unique
+  tier                 SubscriptionTier    @default(FREE)
+  billingInterval      BillingInterval?
+  status               SubscriptionStatus  @default(ACTIVE)
+  currentPeriodEnd     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum SubscriptionTier {
+  FREE
+  PLUS
+  PRO
+}
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+// --- Waitlist (additive; unrelated to auth/users) ---
+model WaitlistSignup {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  token          String    @unique
+  confirmedAt    DateTime?
+  tokenExpiresAt DateTime
+  createdAt      DateTime  @default(now())
 }
 
 enum MaritalStatus {

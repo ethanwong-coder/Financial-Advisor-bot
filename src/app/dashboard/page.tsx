@@ -13,6 +13,8 @@ import {
   RELATIONSHIP_LABELS,
   currency,
 } from "@/lib/labels";
+import { useTier } from "@/components/billing/useTier";
+import { meetsTier, Tier, TIER_LABELS } from "@/lib/billing/tiers";
 
 interface Flag {
   id: string;
@@ -38,50 +40,61 @@ interface Account {
   accountNumberMasked: string | null;
 }
 
-const PLANNING_CATEGORIES = [
+const PLANNING_CATEGORIES: {
+  title: string;
+  tools: { href: string; title: string; blurb: string; tier: Tier }[];
+}[] = [
   {
     title: "Retirement & tax",
     tools: [
-      { href: "/planning/retirement", title: "Retirement projection", blurb: "Projected balance and how long it may last." },
-      { href: "/planning/social-security", title: "Social Security", blurb: "Benefit at 62, FRA, and 70, with breakeven ages." },
-      { href: "/planning/quarterly-tax", title: "Quarterly tax", blurb: "Safe-harbor estimated payments and due dates." },
-      { href: "/planning/niit-amt", title: "NIIT / AMT screener", blurb: "3.8% investment tax and rough AMT exposure." },
-      { href: "/planning/qcd", title: "QCD tracker", blurb: "Charitable IRA distributions against your RMD." },
+      { href: "/planning/retirement", title: "Retirement projection", blurb: "Projected balance and how long it may last.", tier: "FREE" },
+      { href: "/planning/social-security", title: "Social Security", blurb: "Benefit at 62, FRA, and 70, with breakeven ages.", tier: "PLUS" },
+      { href: "/planning/quarterly-tax", title: "Quarterly tax", blurb: "Safe-harbor estimated payments and due dates.", tier: "PLUS" },
+      { href: "/planning/niit-amt", title: "NIIT / AMT screener", blurb: "3.8% investment tax and rough AMT exposure.", tier: "PLUS" },
+      { href: "/planning/qcd", title: "QCD tracker", blurb: "Charitable IRA distributions against your RMD.", tier: "PLUS" },
     ],
   },
   {
     title: "Estate & insurance",
     tools: [
-      { href: "/planning/estate-documents", title: "Estate documents", blurb: "Track will, trust, POAs, and directives." },
-      { href: "/planning/insurance", title: "Insurance needs", blurb: "Life, disability, and LTC coverage gaps." },
+      { href: "/planning/estate-documents", title: "Estate documents", blurb: "Track will, trust, POAs, and directives.", tier: "PLUS" },
+      { href: "/planning/insurance", title: "Insurance needs", blurb: "Life, disability, and LTC coverage gaps.", tier: "PLUS" },
     ],
   },
   {
     title: "Cash flow",
     tools: [
-      { href: "/planning/cash-flow", title: "Cash-flow tools", blurb: "Budget, debt payoff, emergency fund, mortgage/refi." },
+      { href: "/planning/cash-flow", title: "Cash-flow tools", blurb: "Budget & emergency fund (free); debt & mortgage (Plus).", tier: "FREE" },
     ],
   },
   {
     title: "Education & business",
     tools: [
-      { href: "/planning/education", title: "Education planning", blurb: "529 tracking, aid estimate, student loans." },
-      { href: "/planning/business-retirement", title: "Business retirement", blurb: "SEP vs SIMPLE vs Solo 401(k) comparison." },
-      { href: "/planning/equity-comp", title: "Equity comp", blurb: "ISO, NSO, RSU, and ESPP tax illustrations." },
+      { href: "/planning/education", title: "Education planning", blurb: "529 tracking, aid estimate, student loans.", tier: "PRO" },
+      { href: "/planning/business-retirement", title: "Business retirement", blurb: "SEP vs SIMPLE vs Solo 401(k) comparison.", tier: "PRO" },
+      { href: "/planning/equity-comp", title: "Equity comp", blurb: "ISO, NSO, RSU, and ESPP tax illustrations.", tier: "PRO" },
     ],
   },
   {
     title: "Life transitions & goals",
     tools: [
-      { href: "/planning/checklists", title: "Life-transition checklists", blurb: "Marriage, divorce, job change, inheritance, moving." },
-      { href: "/planning/goals", title: "Goal tracking", blurb: "Named goals with progress toward a target." },
-      { href: "/planning/learn", title: "Learn the basics", blurb: "Plain-language explainers for these concepts." },
+      { href: "/planning/checklists", title: "Life-transition checklists", blurb: "Marriage, divorce, job change, inheritance, moving.", tier: "PRO" },
+      { href: "/planning/goals", title: "Goal tracking", blurb: "Named goals with progress toward a target.", tier: "PRO" },
+      { href: "/planning/learn", title: "Learn the basics", blurb: "Plain-language explainers for these concepts.", tier: "FREE" },
+    ],
+  },
+  {
+    title: "Family & reports (Pro)",
+    tools: [
+      { href: "/planning/family", title: "Family accounts", blurb: "Link a second person's finances under your plan.", tier: "PRO" },
+      { href: "/planning/reports", title: "PDF reports", blurb: "Export flags + planning outputs for a professional.", tier: "PRO" },
     ],
   },
 ];
 
 export default function DashboardPage() {
   const reduce = useReducedMotion();
+  const userTier = useTier();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [flags, setFlags] = useState<Flag[]>([]);
   const [nextReviewDate, setNextReviewDate] = useState<string | null>(null);
@@ -141,7 +154,7 @@ export default function DashboardPage() {
       setMessage(
         exRes.ok
           ? `Linked ${exData.linked} sandbox account(s). ${exData.note}`
-          : exData.error ?? "Could not link accounts.",
+          : exData.message ?? exData.error ?? "Could not link accounts.",
       );
       await load();
     } else {
@@ -387,13 +400,28 @@ export default function DashboardPage() {
                 {cat.title}
               </h3>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {cat.tools.map((t) => (
-                  <Link key={t.href} href={t.href} className="card card-hover block">
-                    <div className="mb-2 h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow" />
-                    <h4 className="font-medium text-slate-900">{t.title}</h4>
-                    <p className="mt-1 text-sm text-slate-600">{t.blurb}</p>
-                  </Link>
-                ))}
+                {cat.tools.map((t) => {
+                  const locked =
+                    userTier != null && t.tier !== "FREE" && !meetsTier(userTier, t.tier);
+                  return (
+                    <Link key={t.href} href={t.href} className="card card-hover block">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow" />
+                        {t.tier !== "FREE" && (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              locked ? "bg-slate-100 text-slate-500" : "bg-teal-100 text-teal-800"
+                            }`}
+                          >
+                            {locked ? `🔒 ${TIER_LABELS[t.tier]}` : TIER_LABELS[t.tier]}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-medium text-slate-900">{t.title}</h4>
+                      <p className="mt-1 text-sm text-slate-600">{t.blurb}</p>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}

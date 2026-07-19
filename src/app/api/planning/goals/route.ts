@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { badRequest, json, requireUser, serverError } from "@/lib/http";
+import { requireTierFeature } from "@/lib/billing/entitlements";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -8,6 +9,8 @@ export const runtime = "nodejs";
 export async function GET() {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "goals");
+  if (gate) return gate;
   const goals = await prisma.goal.findMany({
     where: { userId },
     orderBy: { createdAt: "asc" },
@@ -34,6 +37,8 @@ const postSchema = z.object({
 export async function POST(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "goals");
+  if (gate) return gate;
   let body: unknown;
   try {
     body = await req.json();
@@ -70,6 +75,8 @@ const patchSchema = z.object({
 export async function PATCH(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "goals");
+  if (gate) return gate;
   let body: unknown;
   try {
     body = await req.json();
@@ -107,6 +114,8 @@ export async function PATCH(req: Request) {
 export async function DELETE(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "goals");
+  if (gate) return gate;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return badRequest("Missing id");
   const res = await prisma.goal.deleteMany({ where: { id, userId } });

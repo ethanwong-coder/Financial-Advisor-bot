@@ -63,7 +63,7 @@ export default function GoalsPage() {
   }
 
   return (
-    <PlanningShell title="Goal tracking" subtitle="Set named financial goals and track progress toward them.">
+    <PlanningShell requiredTier="PRO" title="Goal tracking" subtitle="Set named financial goals and track progress toward them.">
       {!goals ? (
         <div className="card"><Spinner /></div>
       ) : (

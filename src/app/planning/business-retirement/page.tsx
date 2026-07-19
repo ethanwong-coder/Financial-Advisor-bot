@@ -19,6 +19,7 @@ export default function BusinessRetirementPage() {
 
   return (
     <PlanningShell
+      requiredTier="PRO"
       title="Business retirement plan comparison"
       subtitle="An educational side-by-side of SEP IRA, SIMPLE IRA, and Solo 401(k) contribution room. Not a recommendation on which to choose."
     >

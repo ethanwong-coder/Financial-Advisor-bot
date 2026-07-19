@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db/prisma";
 import { getPlaidAdapter } from "@/lib/plaid/client";
 import { encryptField } from "@/lib/crypto/field-encryption";
 import { badRequest, json, requireUser, serverError } from "@/lib/http";
+import { getUserTier } from "@/lib/billing/entitlements";
+import { accountLimit } from "@/lib/billing/tiers";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -46,8 +48,15 @@ export async function POST(req: Request) {
 
     const accounts = await adapter.getAccounts(accessToken);
 
-    // Upsert linked accounts (dedupe by plaidAccountId).
+    // Enforce the tier account limit (Free = 1 total connected account). Plaid
+    // can return several at once, so cap NEW additions rather than hard-fail.
+    const tier = await getUserTier(userId);
+    const limit = accountLimit(tier);
+    let currentCount = await prisma.account.count({ where: { userId } });
+
+    // Upsert linked accounts (dedupe by plaidAccountId), capping new additions.
     let linked = 0;
+    let skipped = 0;
     for (const a of accounts) {
       const existing = await prisma.account.findFirst({
         where: { userId, plaidAccountId: a.plaidAccountId },
@@ -63,6 +72,10 @@ export async function POST(req: Request) {
           },
         });
       } else {
+        if (currentCount >= limit) {
+          skipped += 1;
+          continue;
+        }
         await prisma.account.create({
           data: {
             userId,
@@ -77,15 +90,19 @@ export async function POST(req: Request) {
           },
         });
         linked += 1;
+        currentCount += 1;
       }
     }
 
     return json({
       linked,
+      skipped,
       total: accounts.length,
       mode: adapter.mode,
       note:
-        "Plaid does not provide beneficiary designations. Add beneficiaries manually on each linked account.",
+        skipped > 0
+          ? `Linked ${linked} of ${accounts.length}. The Free plan is limited to 1 connected account — upgrade to Plus to link the rest. Plaid does not provide beneficiary designations; add them manually.`
+          : "Plaid does not provide beneficiary designations. Add beneficiaries manually on each linked account.",
     });
   } catch (err) {
     log.error("plaid exchange failed", err);

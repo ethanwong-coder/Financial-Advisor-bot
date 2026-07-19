@@ -86,7 +86,7 @@ export default function NewAccountPage() {
     setSaving(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Could not add the account.");
+      setError(data.message ?? data.error ?? "Could not add the account.");
       return;
     }
     router.push("/dashboard");

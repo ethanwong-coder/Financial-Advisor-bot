@@ -5,6 +5,7 @@ import { loadCaseFile } from "@/lib/case-file";
 import { runRulesEngine } from "@/lib/rules/engine";
 import { isQcdEligible } from "@/lib/planning/qcd";
 import { PLANNING_TAX_YEAR } from "@/lib/planning/constants";
+import { requireTierFeature } from "@/lib/billing/entitlements";
 import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -19,6 +20,8 @@ const IRA_TYPES = new Set(["TRADITIONAL_IRA", "ROTH_IRA", "INHERITED_IRA"]);
 export async function GET(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "calc_qcd");
+  if (gate) return gate;
 
   const taxYear = Number(
     new URL(req.url).searchParams.get("taxYear") ?? PLANNING_TAX_YEAR,
@@ -91,6 +94,8 @@ const postSchema = z.object({
 export async function POST(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "calc_qcd");
+  if (gate) return gate;
 
   let body: unknown;
   try {
@@ -130,6 +135,8 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const userId = await requireUser();
   if (userId instanceof Response) return userId;
+  const gate = await requireTierFeature(userId, "calc_qcd");
+  if (gate) return gate;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return badRequest("Missing id");
   const res = await prisma.qcdEntry.deleteMany({ where: { id, userId } });

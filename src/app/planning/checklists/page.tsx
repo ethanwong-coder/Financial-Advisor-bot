@@ -40,6 +40,7 @@ export default function ChecklistsPage() {
 
   return (
     <PlanningShell
+      requiredTier="PRO"
       title="Life-transition checklists"
       subtitle="Standard task lists for major life changes — not personalized advice. Check items off as you complete them."
     >

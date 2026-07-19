@@ -170,6 +170,7 @@ function LoansTab() {
 export default function EducationPage() {
   return (
     <PlanningShell
+      requiredTier="PRO"
       title="Education planning"
       subtitle="Track 529/Coverdell accounts, get a rough aid estimate, and compare student-loan repayment. Informational only."
     >

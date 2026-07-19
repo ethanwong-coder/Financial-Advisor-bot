@@ -35,6 +35,7 @@ export default function NiitAmtPage() {
 
   return (
     <PlanningShell
+      requiredTier="PLUS"
       title="NIIT / AMT screener"
       subtitle="A quick screen for the 3.8% Net Investment Income Tax and a rough AMT exposure flag. Informational only."
     >
