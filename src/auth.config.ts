@@ -12,6 +12,7 @@ const PROTECTED_PREFIXES = [
   "/chat",
   "/planning",
   "/settings",
+  "/billing",
 ];
 
 export const authConfig = {

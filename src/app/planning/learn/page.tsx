@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { GLOSSARY, GLOSSARY_CATEGORIES } from "@/lib/planning/glossary";
 
-export const metadata = { title: "Learn — Estate Organizer" };
+export const metadata = { title: "Learn — Advisr" };
 
 export default function LearnPage() {
   return (

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { WaitlistForm } from "@/components/WaitlistForm";
 
 export const metadata: Metadata = {
-  title: "Join the waitlist — Estate Organizer",
+  title: "Join the waitlist — Advisr",
   description:
-    "Be first to know when new Estate Organizer planning tools and plans go live.",
+    "Be first to know when new Advisr planning tools and plans go live.",
 };
 
 export default function WaitlistPage() {

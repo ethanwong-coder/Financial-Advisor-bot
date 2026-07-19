@@ -26,6 +26,10 @@ model User {
   passwordHash String
   name         String?
 
+  // Null until the first-run onboarding tour is finished OR skipped. Once set,
+  // the tour no longer auto-opens (users can still replay it from Settings).
+  onboardingCompletedAt DateTime?
+
   profile       Profile?
   familyMembers FamilyMember[]
   lifeEvents    LifeEvent[]

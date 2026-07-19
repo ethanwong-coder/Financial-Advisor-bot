@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   PRICING,
   annualSavingsPercent,
+  meetsTier,
   monthlyEquivalentOfAnnual,
 } from "@/lib/billing/tiers";
+import { useTier } from "@/components/billing/useTier";
 
 const FEATURES = {
   FREE: [
@@ -34,9 +36,48 @@ const FEATURES = {
 
 export default function PricingPage() {
   const router = useRouter();
+  const userTier = useTier();
   const [annual, setAnnual] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Surface a returned-from-Stripe cancel gracefully (no charge was made).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "canceled") {
+      setNotice(
+        "Checkout canceled — you haven't been charged. Pick a plan whenever you're ready.",
+      );
+    }
+  }, []);
+
+  // The right CTA for a paid-plan card given the user's current tier: manage if
+  // it's their plan (or lower than their plan), otherwise start checkout.
+  function planCta(cardTier: "PLUS" | "PRO") {
+    if (userTier === cardTier) {
+      return (
+        <Link href="/settings/billing" className="btn-secondary inline-flex w-full justify-center">
+          Current plan · Manage
+        </Link>
+      );
+    }
+    if (userTier && meetsTier(userTier, cardTier)) {
+      return (
+        <Link href="/settings/billing" className="btn-secondary inline-flex w-full justify-center">
+          Manage plan
+        </Link>
+      );
+    }
+    return (
+      <button
+        className="btn-primary w-full"
+        disabled={busy === cardTier}
+        onClick={() => subscribe(cardTier)}
+      >
+        {busy === cardTier ? "Starting…" : `Choose ${cardTier === "PRO" ? "Pro" : "Plus"}`}
+      </button>
+    );
+  }
 
   async function subscribe(tier: "PLUS" | "PRO") {
     setBusy(tier);
@@ -98,9 +139,15 @@ export default function PricingPage() {
       <div className="mt-8 grid gap-4 lg:grid-cols-3">
         {/* FREE */}
         <PlanCard title="Free" price="$0" cadence="forever" features={FEATURES.FREE}>
-          <button className="btn-secondary w-full" onClick={() => router.push("/register")}>
-            Get started
-          </button>
+          {userTier === "PLUS" || userTier === "PRO" ? (
+            <button className="btn-secondary w-full" disabled>
+              Included in your plan
+            </button>
+          ) : (
+            <button className="btn-secondary w-full" onClick={() => router.push("/register")}>
+              Get started
+            </button>
+          )}
         </PlanCard>
 
         {/* PLUS */}
@@ -113,9 +160,7 @@ export default function PricingPage() {
           everythingIn="Free"
           features={FEATURES.PLUS}
         >
-          <button className="btn-primary w-full" disabled={busy === "PLUS"} onClick={() => subscribe("PLUS")}>
-            {busy === "PLUS" ? "Starting…" : "Choose Plus"}
-          </button>
+          {planCta("PLUS")}
         </PlanCard>
 
         {/* PRO */}
@@ -127,9 +172,7 @@ export default function PricingPage() {
           everythingIn="Plus"
           features={FEATURES.PRO}
         >
-          <button className="btn-primary w-full" disabled={busy === "PRO"} onClick={() => subscribe("PRO")}>
-            {busy === "PRO" ? "Starting…" : "Choose Pro"}
-          </button>
+          {planCta("PRO")}
         </PlanCard>
       </div>
 

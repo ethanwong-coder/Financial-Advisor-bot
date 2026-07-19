@@ -21,6 +21,19 @@ async function fetchTier(): Promise<Tier> {
   return inflight;
 }
 
+/** Seed the cache with a known tier (e.g. right after a confirmed upgrade). */
+export function primeTier(tier: Tier): void {
+  cache = tier;
+  inflight = null;
+}
+
+/** Clear the cache and refetch from the server (source of truth). */
+export function refreshTier(): Promise<Tier> {
+  cache = null;
+  inflight = null;
+  return fetchTier();
+}
+
 /** Returns the current user's tier, or null while loading. UI only — real
  * enforcement is server-side on the gated routes. */
 export function useTier(): Tier | null {

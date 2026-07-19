@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Spinner } from "@/components/Spinner";
 import { TIER_LABELS, Tier } from "@/lib/billing/tiers";
+import { ReplayTourButton } from "@/components/onboarding/ReplayTourButton";
 
 interface BillingInfo {
   tier: Tier;
@@ -93,6 +94,17 @@ export default function BillingSettingsPage() {
           )}
         </div>
       )}
+
+      {/* Help & onboarding */}
+      <div className="card mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-medium text-slate-900">Product tour</h2>
+          <p className="mt-0.5 text-sm text-slate-600">
+            New here or need a refresher? Replay the guided walkthrough of every tool.
+          </p>
+        </div>
+        <ReplayTourButton className="btn-secondary shrink-0" />
+      </div>
     </div>
   );
 }

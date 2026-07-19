@@ -4,9 +4,11 @@ import "./globals.css";
 import { auth } from "@/auth";
 import { SignOutButton } from "@/components/SignOutButton";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
+import { OnboardingTour } from "@/components/onboarding/OnboardingTour";
+import { UpgradeNavButton } from "@/components/billing/UpgradeNavButton";
 
 export const metadata: Metadata = {
-  title: "Estate Organizer — informational paperwork tracker",
+  title: "Advisr — informational paperwork tracker",
   description:
     "Spot gaps in your financial and estate paperwork. Informational only — not investment or legal advice.",
 };
@@ -30,7 +32,7 @@ export default async function RootLayout({
               className="flex items-center gap-2 font-semibold text-brand"
             >
               <span className="inline-block h-6 w-6 rounded-lg bg-gradient-to-br from-teal-400 to-brand-dark shadow-sm" />
-              Estate Organizer
+              Advisr
             </Link>
             <nav className="flex items-center gap-4 text-sm">
               {loggedIn ? (
@@ -50,6 +52,7 @@ export default async function RootLayout({
                   <Link href="/settings/billing" className="text-slate-600 hover:text-slate-900">
                     Billing
                   </Link>
+                  <UpgradeNavButton />
                   <SignOutButton />
                 </>
               ) : (
@@ -62,6 +65,10 @@ export default async function RootLayout({
         </header>
 
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
+
+        {/* First-run walkthrough (self-gates via /api/onboarding); only for
+            signed-in users. Replayable from Settings → Billing. */}
+        {loggedIn && <OnboardingTour />}
 
         <footer>
           <DisclaimerBanner />

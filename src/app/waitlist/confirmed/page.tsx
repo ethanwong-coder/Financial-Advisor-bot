@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Waitlist confirmation — Estate Organizer",
+  title: "Waitlist confirmation — Advisr",
 };
 
 type Status = "ok" | "already" | "expired" | "invalid" | "error";

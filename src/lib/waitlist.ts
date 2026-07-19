@@ -25,9 +25,9 @@ export function buildConfirmationEmail(
 ): { subject: string; text: string } {
   const confirmUrl = buildConfirmUrl(origin, token);
   return {
-    subject: "Confirm your spot on the Estate Organizer waitlist",
+    subject: "Confirm your spot on the Advisr waitlist",
     text: [
-      "Thanks for joining the Estate Organizer waitlist!",
+      "Thanks for joining the Advisr waitlist!",
       "",
       "Please confirm your email by opening the link below:",
       confirmUrl,
@@ -35,7 +35,7 @@ export function buildConfirmationEmail(
       "This link expires in 3 days. If you didn't request this, you can ignore",
       "this email and nothing will happen.",
       "",
-      "— Estate Organizer",
+      "— Advisr",
     ].join("\n"),
   };
 }

@@ -127,7 +127,7 @@ function createLiveAdapter(clientId: string, secret: string): PlaidAdapter {
     async createLinkToken(userId: string) {
       const res = await client.linkTokenCreate({
         user: { client_user_id: userId },
-        client_name: "Estate Organizer",
+        client_name: "Advisr",
         products: [Products.Auth],
         country_codes: [CountryCode.Us],
         language: "en",

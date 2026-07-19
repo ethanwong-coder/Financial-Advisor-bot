@@ -1,4 +1,4 @@
-# Estate Organizer (MVP)
+# Advisr (MVP)
 
 An **informational, compliance-tracking** tool that helps people spot gaps in
 their financial and estate paperwork. It keeps a persistent per-user "case file"
@@ -299,22 +299,42 @@ entitlements from Stripe directly.
 - **Pages:** `/pricing` (monthly/annual toggle) and `/settings/billing` (current
   plan + Stripe Billing Portal link).
 
-**Turning on Stripe** (deferred — the app runs fully on the Free tier without it)
+**In-app purchase flow** (fully implemented; the app still runs on Free without Stripe keys)
+
+The purchase path is built end to end with the `stripe` SDK:
+
+- **Entry points:** an always-visible **Upgrade / Go Pro** button in the nav (hidden
+  for Pro), the `/pricing` page, and contextual `UpgradePrompt`s that send a
+  gated free user **straight to checkout** for the required tier.
+- **Checkout** (`POST /api/billing/checkout`): finds-or-creates the Stripe
+  Customer, opens a **hosted Stripe Checkout** session (we never touch card data),
+  and redirects. `success_url` → `/billing/success`, `cancel_url` → `/pricing?checkout=canceled`.
+- **Success** (`/billing/success`): polls `getUserTier()` until the webhook lands,
+  then shows a "You're now on {tier}!" confirmation; degrades gracefully if the
+  webhook is slow.
+- **Webhook** (`POST /api/billing/webhook`): **signature-verified** (rejects unsigned
+  /invalid), the single source of truth. Handles `checkout.session.completed`,
+  `customer.subscription.created|updated|deleted`, and `invoice.payment_failed`,
+  upserting the `Subscription` row (tier / interval / status / period end).
+- **Manage** (`POST /api/billing/portal`): opens the Stripe **Billing Portal** for
+  card / plan / cancellation changes.
+
+To go live, provide these (the code is already wired — nothing else to build):
 
 1. In the Stripe Dashboard create **4 recurring Prices**: Plus monthly, Plus
-   annual, Pro monthly, Pro annual.
-2. Set the env vars in [`.env.example`](.env.example): `STRIPE_SECRET_KEY`,
+   annual, Pro monthly, Pro annual; enable the **Customer Portal** (Settings →
+   Billing → Customer portal).
+2. Set the env vars from [`.env.example`](.env.example): `STRIPE_SECRET_KEY`,
    `STRIPE_WEBHOOK_SECRET`, and the four `STRIPE_*_PRICE_ID`s.
-3. Finish the three route stubs in `src/app/api/billing/` (`checkout`, `portal`,
-   `webhook`) — each documents exactly what to implement. **Checkout** uses a
-   hosted Stripe Checkout session; **portal** uses the Billing Portal; **webhook**
-   must **verify the signature** and upsert the `Subscription` row on
-   `checkout.session.completed` / `customer.subscription.updated|deleted` /
-   `invoice.payment_failed`. Until configured, `/api/billing/*` returns
-   `503 billing_not_configured` and the pricing page shows a notice.
+3. Point a webhook endpoint at `/api/billing/webhook` (or run
+   `stripe listen --forward-to localhost:3000/api/billing/webhook` locally and use
+   the `whsec_…` it prints).
+
+Until the keys are set, `/api/billing/*` returns `503 billing_not_configured` and
+the UI shows a friendly "checkout isn't live yet" notice — no broken states.
 
 > Card data is never stored or handled by this app — Stripe Checkout and the
-> Billing Portal own all of it. The webhook must reject unsigned/invalid requests.
+> Billing Portal own all of it. The webhook rejects unsigned/invalid requests.
 
 The seed ([scripts/seed.ts](scripts/seed.ts)) gives `demo@example.com` a **Pro**
 subscription so every gated feature is exercisable without Stripe.
